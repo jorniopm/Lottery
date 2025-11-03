@@ -24,7 +24,7 @@ public class LotteryController {
     public void start() {
         boolean repeatAllowed = view.isRepeatAllowed();
         if (!repeatAllowed && usedIds.size() == users.size()) {
-            view.showMessage("所有人都已被抽过！");
+            view.showMessage("所有人都已被抽过！", new ArrayList<>());
             return;
         }
         if (timeline != null && timeline.getStatus() == Animation.Status.RUNNING)
@@ -73,7 +73,7 @@ public class LotteryController {
         }
 
         if (availableUsersForRandom.isEmpty()) {
-            view.showMessage("所有人都已被抽过！");
+            view.showMessage("所有人都已被抽过！", new ArrayList<>());
             if (timeline != null) {
                 timeline.stop();
             }

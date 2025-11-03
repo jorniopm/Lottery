@@ -11,7 +11,11 @@ public class UserLoader {
             while ((line = br.readLine()) != null) {
                 String[] parts = line.split(",");
                 if (parts.length >= 3) {
-                    users.add(new User(parts[0].trim(), parts[1].trim(), parts[2].trim()));
+                    String id = parts[0].trim();
+                    String name = parts[1].trim();
+                    String photoPath = parts[2].trim();
+                    System.out.println("UserLoader: Loading user: " + id + ", Name: " + name + ", Photo Path: " + photoPath);
+                    users.add(new User(id, name, photoPath));
                 }
             }
         } catch (IOException e) {

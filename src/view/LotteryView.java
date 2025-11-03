@@ -1,7 +1,6 @@
 package view;
 
 import javafx.scene.Node;
-import javafx.scene.Node;
 import controller.LotteryController;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -94,14 +93,17 @@ public class LotteryView {
     }
 
     private Image loadImage(String path, double reqWidth, double reqHeight) {
+        System.out.println("loadImage: Attempting to load image from path: " + path);
         if (path == null || path.trim().isEmpty()) return null;
 
         String cacheKey = path + "_" + reqWidth + "_" + reqHeight;
         if (imageCache.containsKey(cacheKey)) {
+            System.out.println("loadImage: Image found in cache for key: " + cacheKey);
             return imageCache.get(cacheKey);
         }
 
         try {
+            System.out.println("loadImage: Cache miss for key: " + cacheKey);
             String uri = null;
             String p = path.trim();
             if (p.startsWith("http://") || p.startsWith("https://") || p.startsWith("file:")) {
@@ -119,11 +121,20 @@ public class LotteryView {
                 }
             }
             if (uri != null) {
+                System.out.println("loadImage: Resolved URI: " + uri);
                 Image image = new Image(uri, reqWidth, reqHeight, true, true);
+                if (image.isError()) {
+                    System.err.println("loadImage: Error loading image from URI: " + uri + ", Error: " + image.exceptionProperty().get().getMessage());
+                } else {
+                    System.out.println("loadImage: Image loaded successfully from URI: " + uri);
+                }
                 imageCache.put(cacheKey, image);
                 return image;
+            } else {
+                System.out.println("loadImage: URI is null, image not loaded.");
             }
         } catch (Exception e) {
+            System.err.println("loadImage: Exception while loading image from path: " + path + ", Exception: " + e.getMessage());
             // ignore and return null
         }
         return null;
@@ -167,7 +178,39 @@ public class LotteryView {
 //        alert.showAndWait();
 //    }
 
+    //    public void showMessage(String msg, List<User> winners) {
+//        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+//        alert.setTitle("抽奖结果");
+//        alert.setHeaderText(null);
+//        alert.setGraphic(null);
+//
+//        VBox contentBox = new VBox(10);
+//        contentBox.setAlignment(Pos.CENTER);
+//        contentBox.getChildren().add(new Label(msg));
+//
+//        if (winners != null && !winners.isEmpty()) {
+//            for (User user : winners) {
+//                HBox winnerBox = new HBox(10);
+//                winnerBox.setAlignment(Pos.CENTER_LEFT);
+//                Image img = loadImage(user.getPhotoPath(), 60, 60);
+//                if (img != null) {
+//                    ImageView iv = new ImageView(img);
+//                    iv.setFitWidth(60);
+//                    iv.setFitHeight(60);
+//                    iv.setPreserveRatio(true);
+//                    winnerBox.getChildren().add(iv);
+//                }
+//                Label winnerLabel = new Label(user.getId() + " - " + user.getName());
+//                winnerBox.getChildren().add(winnerLabel);
+//                contentBox.getChildren().add(winnerBox);
+//            }
+//        }
+//        alert.getDialogPane().setContent(contentBox);
+//        alert.showAndWait();
+//    }
+//
     public void showMessage(String msg, List<User> winners) {
+        System.out.println("showMessage called with msg: " + msg + ", winners count: " + (winners != null ? winners.size() : "null"));
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("抽奖结果");
         alert.setHeaderText(null);
@@ -178,7 +221,9 @@ public class LotteryView {
         contentBox.getChildren().add(new Label(msg));
 
         if (winners != null && !winners.isEmpty()) {
+            System.out.println("Displaying winners:");
             for (User user : winners) {
+                System.out.println("  Winner: " + user.getId() + " - " + user.getName());
                 HBox winnerBox = new HBox(10);
                 winnerBox.setAlignment(Pos.CENTER_LEFT);
                 Image img = loadImage(user.getPhotoPath(), 60, 60);
@@ -188,19 +233,20 @@ public class LotteryView {
                     iv.setFitHeight(60);
                     iv.setPreserveRatio(true);
                     winnerBox.getChildren().add(iv);
+                } else {
+                    System.out.println("    Could not load image for user: " + user.getName() + " at path: " + user.getPhotoPath());
                 }
                 Label winnerLabel = new Label(user.getId() + " - " + user.getName());
                 winnerBox.getChildren().add(winnerLabel);
                 contentBox.getChildren().add(winnerBox);
             }
+        } else {
+            System.out.println("No winners to display or winners list is empty.");
         }
         alert.getDialogPane().setContent(contentBox);
         alert.showAndWait();
     }
 
-    public void showMessage(String msg) {
-        showMessage(msg, null);
-    }
 
     // 提供接口给控制器读取
     public int getDrawCount() {
