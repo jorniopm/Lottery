@@ -4,6 +4,7 @@ import javafx.animation.*;
 import javafx.util.Duration;
 import model.User;
 import view.LotteryView;
+
 import java.util.*;
 
 public class LotteryController {
@@ -21,7 +22,8 @@ public class LotteryController {
     }
 
     public void start() {
-        if (usedIds.size() == users.size()) {
+        boolean repeatAllowed = view.isRepeatAllowed();
+        if (!repeatAllowed && usedIds.size() == users.size()) {
             view.showMessage("所有人都已被抽过！");
             return;
         }
@@ -36,18 +38,45 @@ public class LotteryController {
     public void stop() {
         if (timeline != null && timeline.getStatus() == Animation.Status.RUNNING) {
             timeline.stop();
-            if (currentUser != null) {
-                usedIds.add(currentUser.getId());
-                view.showMessage("中奖者：" + currentUser.getName() + "（编号 " + currentUser.getId() + "）");
+            int count = view.getDrawCount();
+            boolean repeatAllowed = view.isRepeatAllowed();
+
+            List<User> winners = new ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                User user = drawOne(repeatAllowed);
+                if (user != null) winners.add(user);
             }
+
+            view.showMessage("中奖名单：", winners);
         }
     }
 
+    private User drawOne(boolean repeatAllowed) {
+        List<User> available = new ArrayList<>(users);
+        if (!repeatAllowed) {
+            available.removeIf(u -> usedIds.contains(u.getId()));
+        }
+        if (available.isEmpty()) return null;
+        User selected = available.get(random.nextInt(available.size()));
+        if (!repeatAllowed) usedIds.add(selected.getId());
+        return selected;
+    }
+
     private void showRandomUser() {
+        boolean repeatAllowed = view.isRepeatAllowed();
         User user;
-        do {
+        if (repeatAllowed) {
             user = users.get(random.nextInt(users.size()));
-        } while (usedIds.contains(user.getId()));
+        } else {
+            List<User> available = new ArrayList<>(users);
+            available.removeIf(u -> usedIds.contains(u.getId()));
+            if (available.isEmpty()) {
+                view.showMessage("所有人都已被抽过！");
+                timeline.stop();
+                return;
+            }
+            user = available.get(random.nextInt(available.size()));
+        }
         currentUser = user;
         view.updateDisplay(user);
     }
