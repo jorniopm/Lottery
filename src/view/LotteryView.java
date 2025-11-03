@@ -7,7 +7,6 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.SnapshotParameters;
 import javafx.scene.control.*;
-import javafx.scene.effect.DropShadow;
 import javafx.scene.image.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -81,9 +80,9 @@ public class LotteryView {
             if (i < currentCardCount) {
                 card = (VBox) currentCards.get(i);
                 ImageView imageView = (ImageView) card.getChildren().get(0);
+                imageView.setImage(user.getRoundedImage());
                 Label nameIdLabel = (Label) card.getChildren().get(1);
                 Image img = loadImage(user.getPhotoPath(), 113, 150);
-                imageView.setImage(img);
                 nameIdLabel.setText(user.getId() + " - " + user.getName());
             } else {
                 card = createUserCard(user);
