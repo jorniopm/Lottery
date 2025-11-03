@@ -63,22 +63,35 @@ public class LotteryController {
     }
 
     private void showRandomUser() {
+        int count = view.getDrawCount();
         boolean repeatAllowed = view.isRepeatAllowed();
-        User user;
-        if (repeatAllowed) {
-            user = users.get(random.nextInt(users.size()));
-        } else {
-            List<User> available = new ArrayList<>(users);
-            available.removeIf(u -> usedIds.contains(u.getId()));
-            if (available.isEmpty()) {
-                view.showMessage("所有人都已被抽过！");
-                timeline.stop();
-                return;
-            }
-            user = available.get(random.nextInt(available.size()));
+        List<User> usersToDisplay = new ArrayList<>();
+
+        List<User> availableUsersForRandom = new ArrayList<>(users);
+        if (!repeatAllowed) {
+            availableUsersForRandom.removeIf(u -> usedIds.contains(u.getId()));
         }
-        currentUser = user;
-        view.updateDisplay(user);
+
+        if (availableUsersForRandom.isEmpty()) {
+            view.showMessage("所有人都已被抽过！");
+            if (timeline != null) {
+                timeline.stop();
+            }
+            return;
+        }
+
+        // Select 'count' random users for display during scrolling
+        for (int i = 0; i < count; i++) {
+            if (availableUsersForRandom.isEmpty()) {
+                break; // Not enough users to display 'count' unique users
+            }
+            User user = availableUsersForRandom.get(random.nextInt(availableUsersForRandom.size()));
+            usersToDisplay.add(user);
+            if (!repeatAllowed) {
+                availableUsersForRandom.remove(user);
+            }
+        }
+        view.updateDisplay(usersToDisplay);
     }
 
 }
