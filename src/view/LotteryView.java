@@ -1,12 +1,17 @@
 package view;
 
+import javafx.geometry.Insets;
 import javafx.scene.Node;
 import controller.LotteryController;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.control.*;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.image.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import model.User;
@@ -36,7 +41,7 @@ public class LotteryView {
 
         Label countLabel = new Label("每次抽取人数：");
         countField = new TextField("1");
-        countField.setPrefWidth(60);
+        countField.setPrefWidth(40);
         repeatCheck = new CheckBox("允许重复抽取");
         repeatCheck.setSelected(false);
 
@@ -53,9 +58,9 @@ public class LotteryView {
         root.setAlignment(Pos.CENTER);
         root.setStyle("-fx-background-color: linear-gradient(to bottom, #F5F7FA, #b8c4db);");
 
-        Scene scene = new Scene(root, 500, 450);
+        Scene scene = new Scene(root, 500, 600);
         stage.setScene(scene);
-        stage.setTitle("JavaFX 抽奖程序");
+        stage.setTitle("抽奖程序");
         stage.show();
 
         controller = new LotteryController(users, this);
@@ -77,7 +82,7 @@ public class LotteryView {
                 card = (VBox) currentCards.get(i);
                 ImageView imageView = (ImageView) card.getChildren().get(0);
                 Label nameIdLabel = (Label) card.getChildren().get(1);
-                Image img = loadImage(user.getPhotoPath(), 100, 100);
+                Image img = loadImage(user.getPhotoPath(), 113, 150);
                 imageView.setImage(img);
                 nameIdLabel.setText(user.getId() + " - " + user.getName());
             } else {
@@ -142,109 +147,90 @@ public class LotteryView {
 
     private VBox createUserCard(User user) {
         ImageView imageView = new ImageView();
-        imageView.setFitWidth(100);
-        imageView.setFitHeight(100);
-        imageView.setPreserveRatio(true);
-        Image img = loadImage(user.getPhotoPath(), 100, 100);
+        imageView.setFitWidth(113);
+        imageView.setFitHeight(150);
+        imageView.setPreserveRatio(false); // 保证矩形比例正确
+
+        Image img = loadImage(user.getPhotoPath(), 113, 150);
         imageView.setImage(img);
 
-        Label nameIdLabel = new Label(user.getId() + " - " + user.getName());
-        nameIdLabel.setFont(Font.font("Microsoft YaHei", 14));
+        Rectangle clip = new Rectangle(113, 150);
+        clip.setArcWidth(15);  // 控制圆角弧度
+        clip.setArcHeight(15);
+        imageView.setClip(clip);
 
-        VBox card = new VBox(5, imageView, nameIdLabel);
-        card.setAlignment(Pos.CENTER);
-        card.setStyle("-fx-border-color: lightgray; -fx-border-radius: 5; -fx-padding: 5;");
-        return card;
+        SnapshotParameters params = new SnapshotParameters();
+        params.setFill(Color.TRANSPARENT); // 避免裁剪后黑边
+        WritableImage roundedImg = imageView.snapshot(params, null);
+
+        Label nameIdLabel = new Label(user.getId() + " - " + user.getName());
+        nameIdLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #333;");
+
+        return new VBox(5, imageView, nameIdLabel);
     }
 
-//    public void showWinner(User user) {
-//        if (user == null) return;
-//        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-//        alert.setTitle("抽奖结果");
-//        alert.setHeaderText(null);
-//        alert.setContentText("中奖者：" + user.getName() + "（编号 " + user.getId() + "）");
-//
-//        Image img = loadImage(user.getPhotoPath(), 120, 120);
-//        if (img != null) {
-//            ImageView iv = new ImageView(img);
-//            iv.setFitWidth(120);
-//            iv.setFitHeight(120);
-//            iv.setPreserveRatio(true);
-//            alert.setGraphic(iv);
-//        } else {
-//            alert.setGraphic(null);
-//        }
-//
-//        alert.showAndWait();
-//    }
 
-    //    public void showMessage(String msg, List<User> winners) {
-//        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-//        alert.setTitle("抽奖结果");
-//        alert.setHeaderText(null);
-//        alert.setGraphic(null);
-//
-//        VBox contentBox = new VBox(10);
-//        contentBox.setAlignment(Pos.CENTER);
-//        contentBox.getChildren().add(new Label(msg));
-//
-//        if (winners != null && !winners.isEmpty()) {
-//            for (User user : winners) {
-//                HBox winnerBox = new HBox(10);
-//                winnerBox.setAlignment(Pos.CENTER_LEFT);
-//                Image img = loadImage(user.getPhotoPath(), 60, 60);
-//                if (img != null) {
-//                    ImageView iv = new ImageView(img);
-//                    iv.setFitWidth(60);
-//                    iv.setFitHeight(60);
-//                    iv.setPreserveRatio(true);
-//                    winnerBox.getChildren().add(iv);
-//                }
-//                Label winnerLabel = new Label(user.getId() + " - " + user.getName());
-//                winnerBox.getChildren().add(winnerLabel);
-//                contentBox.getChildren().add(winnerBox);
-//            }
-//        }
-//        alert.getDialogPane().setContent(contentBox);
-//        alert.showAndWait();
-//    }
-//
+
+
     public void showMessage(String msg, List<User> winners) {
-        System.out.println("showMessage called with msg: " + msg + ", winners count: " + (winners != null ? winners.size() : "null"));
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("抽奖结果");
-        alert.setHeaderText(null);
-        alert.setGraphic(null);
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("抽奖结果");
+        dialog.setHeaderText(msg);
 
-        VBox contentBox = new VBox(10);
-        contentBox.setAlignment(Pos.CENTER);
-        contentBox.getChildren().add(new Label(msg));
+        FlowPane contentPane = new FlowPane(20, 20);
+        contentPane.setAlignment(Pos.CENTER);
+        contentPane.setPadding(new Insets(20));
 
         if (winners != null && !winners.isEmpty()) {
-            System.out.println("Displaying winners:");
             for (User user : winners) {
-                System.out.println("  Winner: " + user.getId() + " - " + user.getName());
-                HBox winnerBox = new HBox(10);
-                winnerBox.setAlignment(Pos.CENTER_LEFT);
-                Image img = loadImage(user.getPhotoPath(), 60, 60);
-                if (img != null) {
+                VBox card = new VBox(10);
+                card.setAlignment(Pos.CENTER);
+
+                // 创建圆角矩形头像
+                try {
+                    String imgPath = new File(user.getPhotoPath()).toURI().toString();
+                    Image img = new Image(imgPath, 113, 150, true, true);
                     ImageView iv = new ImageView(img);
-                    iv.setFitWidth(60);
-                    iv.setFitHeight(60);
-                    iv.setPreserveRatio(true);
-                    winnerBox.getChildren().add(iv);
-                } else {
-                    System.out.println("    Could not load image for user: " + user.getName() + " at path: " + user.getPhotoPath());
+                    iv.setFitWidth(113);
+                    iv.setFitHeight(150);
+                    iv.setPreserveRatio(false);
+
+                    // 生成圆角矩形图像
+                    Rectangle clip = new Rectangle(113, 150);
+                    clip.setArcWidth(15);
+                    clip.setArcHeight(15);
+                    iv.setClip(clip);
+
+                    SnapshotParameters params = new SnapshotParameters();
+                    params.setFill(Color.TRANSPARENT);
+                    WritableImage roundedImage = iv.snapshot(params, null);
+
+                    iv.setClip(null);
+                    iv.setImage(roundedImage);
+
+                    card.getChildren().add(iv);
+                } catch (Exception e) {
+                    System.out.println("图片加载失败：" + user.getPhotoPath());
                 }
-                Label winnerLabel = new Label(user.getId() + " - " + user.getName());
-                winnerBox.getChildren().add(winnerLabel);
-                contentBox.getChildren().add(winnerBox);
+
+                Label nameLabel = new Label(user.getId() + " - " + user.getName());
+                nameLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #333;");
+                card.getChildren().add(nameLabel);
+
+                contentPane.getChildren().add(card);
             }
         } else {
-            System.out.println("No winners to display or winners list is empty.");
+            contentPane.getChildren().add(new Label("暂无中奖者"));
         }
-        alert.getDialogPane().setContent(contentBox);
-        alert.showAndWait();
+
+        ScrollPane scrollPane = new ScrollPane(contentPane);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPrefHeight(300);
+        scrollPane.setStyle("-fx-background-color: transparent;");
+
+        dialog.getDialogPane().setContent(scrollPane);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.showAndWait();
     }
 
 
