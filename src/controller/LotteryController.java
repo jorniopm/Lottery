@@ -165,4 +165,9 @@ public class LotteryController {
         lastWinners = new ArrayList<>();
         history.clear();
     }
+
+    // Snapshot of current users for preview
+    public List<User> getUsersSnapshot() {
+        return new ArrayList<>(users);
+    }
 }

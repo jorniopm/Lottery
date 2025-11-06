@@ -65,32 +65,38 @@ public class LotteryView {
         VBox centerContent = new VBox(20, currentStatusLabel, winnersDisplayPane, optionsBox);
         centerContent.setAlignment(Pos.TOP_CENTER);
         centerContent.setPadding(new Insets(20));
-        centerContent.setStyle("-fx-background-color: linear-gradient(to bottom, #F5F7FA, #b8c4db);");
+        centerContent.setStyle("-fx-background-color: linear-gradient(to bottom, #F5F7FA, #abccf4);");
 
         ScrollPane scroll = new ScrollPane(centerContent);
         scroll.setFitToWidth(true);
         scroll.setFitToHeight(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 
-        // MenuBar replacement for toolbar
+        // Menus
         Menu fileMenu = new Menu("文件");
         MenuItem importItem = new MenuItem("导入名单…");
         MenuItem exportItem = new MenuItem("导出结果…");
         importItem.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.CONTROL_DOWN));
         exportItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN));
         fileMenu.getItems().addAll(importItem, exportItem, new SeparatorMenuItem());
-        MenuBar menuBar = new MenuBar(fileMenu);
+
+        Menu viewMenu = new Menu("查看");
+        MenuItem previewItem = new MenuItem("预览名单…");
+        viewMenu.getItems().addAll(previewItem);
+
+        MenuBar menuBar = new MenuBar(fileMenu, viewMenu);
 
         BorderPane root = new BorderPane();
-        VBox top = new VBox(menuBar); // keep simple now; can add other top bars if needed
+        VBox top = new VBox(menuBar);
         root.setTop(top);
         root.setCenter(scroll);
         root.setBottom(buttonBox);
         BorderPane.setAlignment(buttonBox, Pos.CENTER);
 
-        Scene scene = new Scene(root, 600, 700);
+        Scene scene = new Scene(root, 600, 500);
         stage.setScene(scene);
         stage.setTitle("抽奖程序");
+        applyAppIcon(stage);
         stage.show();
 
         controller = new LotteryController(users, this);
@@ -99,6 +105,27 @@ public class LotteryView {
         stopBtn.setOnAction(e -> controller.stop());
         exportItem.setOnAction(e -> saveLastWinnersToCSV());
         importItem.setOnAction(e -> importUsers());
+        previewItem.setOnAction(e -> previewRoster());
+    }
+
+    private void applyAppIcon(Stage stage) {
+        try {
+            String[] candidates = new String[] {
+                    "images/lottery_icon.png",
+            };
+            for (String p : candidates) {
+                File f = new File(p);
+                if (f.exists()) {
+                    Image icon = new Image(f.toURI().toString());
+                    if (!icon.isError()) {
+                        stage.getIcons().add(icon);
+                        break;
+                    }
+                }
+            }
+        } catch (Exception ignore) {
+            // ignore icon errors
+        }
     }
 
     private void importUsers() {
@@ -123,6 +150,62 @@ public class LotteryView {
         controller.replaceUsers(newUsers);
         winnersDisplayPane.getChildren().clear();
         currentStatusLabel.setText("已导入 " + newUsers.size() + " 人，请点击开始抽奖");
+    }
+
+    private void previewRoster() {
+        List<User> snapshot = controller.getUsersSnapshot();
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("名单预览");
+        dialog.setHeaderText("当前导入人数：" + (snapshot == null ? 0 : snapshot.size()));
+
+        FlowPane contentPane = new FlowPane(20, 20);
+        contentPane.setAlignment(Pos.CENTER);
+        contentPane.setPadding(new Insets(20));
+
+        if (snapshot != null && !snapshot.isEmpty()) {
+            for (User user : snapshot) {
+                VBox card = new VBox(10);
+                card.setAlignment(Pos.CENTER);
+                try {
+                    Image img = loadImage(user.getPhotoPath(), 113, 150);
+                    ImageView iv = new ImageView(img);
+                    iv.setFitWidth(113);
+                    iv.setFitHeight(150);
+                    iv.setPreserveRatio(false);
+
+                    Rectangle clip = new Rectangle(113, 150);
+                    clip.setArcWidth(15);
+                    clip.setArcHeight(15);
+                    iv.setClip(clip);
+
+                    SnapshotParameters params = new SnapshotParameters();
+                    params.setFill(Color.TRANSPARENT);
+                    WritableImage roundedImage = iv.snapshot(params, null);
+                    iv.setClip(null);
+                    iv.setImage(roundedImage);
+
+                    card.getChildren().add(iv);
+                } catch (Exception ex) {
+                    // ignore image errors and only show text
+                }
+                Label nameLabel = new Label(user.getId() + " - " + user.getName());
+                nameLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #333;");
+                card.getChildren().add(nameLabel);
+
+                contentPane.getChildren().add(card);
+            }
+        } else {
+            contentPane.getChildren().add(new Label("暂无名单，请先导入。"));
+        }
+
+        ScrollPane scrollPane = new ScrollPane(contentPane);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPrefHeight(400);
+        scrollPane.setStyle("-fx-background-color: transparent;");
+
+        dialog.getDialogPane().setContent(scrollPane);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CLOSE);
+        dialog.showAndWait();
     }
 
     public void updateDisplay(List<User> usersToDisplay) {
