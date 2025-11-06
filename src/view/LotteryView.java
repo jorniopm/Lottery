@@ -108,6 +108,7 @@ public class LotteryView {
         previewItem.setOnAction(e -> previewRoster());
     }
 
+    // Use images/lottery_icon.png or other candidates
     private void applyAppIcon(Stage stage) {
         try {
             String[] candidates = new String[] {
@@ -220,9 +221,9 @@ public class LotteryView {
             if (i < currentCardCount) {
                 card = (VBox) currentCards.get(i);
                 ImageView imageView = (ImageView) card.getChildren().get(0);
-                imageView.setImage(user.getRoundedImage());
-                Label nameIdLabel = (Label) card.getChildren().get(1);
                 Image img = loadImage(user.getPhotoPath(), 113, 150);
+                imageView.setImage(img);
+                Label nameIdLabel = (Label) card.getChildren().get(1);
                 nameIdLabel.setText(user.getId() + " - " + user.getName());
             } else {
                 card = createUserCard(user);
@@ -238,7 +239,10 @@ public class LotteryView {
 
     private Image loadImage(String path, double reqWidth, double reqHeight) {
         System.out.println("loadImage: Attempting to load image from path: " + path);
-        if (path == null || path.trim().isEmpty()) return null;
+        // Fallback to default if path empty
+        if (path == null || path.trim().isEmpty()) {
+            return getDefaultImage(reqWidth, reqHeight);
+        }
 
         String cacheKey = path + "_" + reqWidth + "_" + reqHeight;
         if (imageCache.containsKey(cacheKey)) {
@@ -268,20 +272,50 @@ public class LotteryView {
                 System.out.println("loadImage: Resolved URI: " + uri);
                 Image image = new Image(uri, reqWidth, reqHeight, true, true);
                 if (image.isError()) {
-                    System.err.println("loadImage: Error loading image from URI: " + uri + ", Error: " + image.exceptionProperty().get().getMessage());
+                    System.err.println("loadImage: Error loading image from URI: " + uri + ", using default placeholder.");
+                    Image def = getDefaultImage(reqWidth, reqHeight);
+                    imageCache.put(cacheKey, def);
+                    return def;
                 } else {
                     System.out.println("loadImage: Image loaded successfully from URI: " + uri);
+                    imageCache.put(cacheKey, image);
+                    return image;
                 }
-                imageCache.put(cacheKey, image);
-                return image;
             } else {
-                System.out.println("loadImage: URI is null, image not loaded.");
+                System.out.println("loadImage: URI is null, using default placeholder.");
+                Image def = getDefaultImage(reqWidth, reqHeight);
+                imageCache.put(cacheKey, def);
+                return def;
             }
         } catch (Exception e) {
             System.err.println("loadImage: Exception while loading image from path: " + path + ", Exception: " + e.getMessage());
-            // ignore and return null
+            return getDefaultImage(reqWidth, reqHeight);
         }
-        return null;
+    }
+
+    private Image getDefaultImage(double reqWidth, double reqHeight) {
+        String[] defaults = new String[] { "images/default.jpg", };
+        for (String p : defaults) {
+            String key = "__DEFAULT__" + p + "_" + reqWidth + "_" + reqHeight;
+            if (imageCache.containsKey(key)) {
+                return imageCache.get(key);
+            }
+            File f = new File(p);
+            if (f.exists()) {
+                try {
+                    Image img = new Image(f.toURI().toString(), reqWidth, reqHeight, true, true);
+                    if (!img.isError()) {
+                        imageCache.put(key, img);
+                        return img;
+                    }
+                } catch (Exception ignore) {
+                    // ignore
+                }
+            }
+        }
+        // As a very last resort, create a 1x1 transparent image to avoid NPEs
+        WritableImage empty = new WritableImage((int)Math.max(1, reqWidth), (int)Math.max(1, reqHeight));
+        return empty;
     }
 
     private VBox createUserCard(User user) {
@@ -324,8 +358,7 @@ public class LotteryView {
 
                 // 创建圆角矩形头像
                 try {
-                    String imgPath = new File(user.getPhotoPath()).toURI().toString();
-                    Image img = new Image(imgPath, 113, 150, true, true);
+                    Image img = loadImage(user.getPhotoPath(), 113, 150);
                     ImageView iv = new ImageView(img);
                     iv.setFitWidth(113);
                     iv.setFitHeight(150);
@@ -346,7 +379,7 @@ public class LotteryView {
 
                     card.getChildren().add(iv);
                 } catch (Exception e) {
-                    System.out.println("图片加载失败：" + user.getPhotoPath());
+                    // ignore and only show text
                 }
 
                 Label nameLabel = new Label(user.getId() + " - " + user.getName());

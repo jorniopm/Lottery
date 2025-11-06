@@ -18,7 +18,6 @@ public class LotteryController {
     private final LotteryView view;
 
     private Timeline timeline;
-    private User currentUser;
 
     // Store last draw result and simple history
     private List<User> lastWinners = new ArrayList<>();
