@@ -8,17 +8,24 @@ import javafx.scene.Scene;
 import javafx.scene.SnapshotParameters;
 import javafx.scene.control.*;
 import javafx.scene.image.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
+import javafx.stage.FileChooser;
 import model.User;
+import model.UserLoader;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.io.File;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class LotteryView {
     private final Stage stage;
@@ -52,12 +59,36 @@ public class LotteryView {
 
         HBox buttonBox = new HBox(20, startBtn, stopBtn);
         buttonBox.setAlignment(Pos.CENTER);
+        buttonBox.setPadding(new Insets(10, 0, 10, 0));
 
-        VBox root = new VBox(20, currentStatusLabel, winnersDisplayPane, optionsBox, buttonBox);
-        root.setAlignment(Pos.CENTER);
-        root.setStyle("-fx-background-color: linear-gradient(to bottom, #F5F7FA, #b8c4db);");
+        // Center content that may overflow: status + winners + options
+        VBox centerContent = new VBox(20, currentStatusLabel, winnersDisplayPane, optionsBox);
+        centerContent.setAlignment(Pos.TOP_CENTER);
+        centerContent.setPadding(new Insets(20));
+        centerContent.setStyle("-fx-background-color: linear-gradient(to bottom, #F5F7FA, #b8c4db);");
 
-        Scene scene = new Scene(root, 500, 600);
+        ScrollPane scroll = new ScrollPane(centerContent);
+        scroll.setFitToWidth(true);
+        scroll.setFitToHeight(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+
+        // MenuBar replacement for toolbar
+        Menu fileMenu = new Menu("文件");
+        MenuItem importItem = new MenuItem("导入名单…");
+        MenuItem exportItem = new MenuItem("导出结果…");
+        importItem.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.CONTROL_DOWN));
+        exportItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN));
+        fileMenu.getItems().addAll(importItem, exportItem, new SeparatorMenuItem());
+        MenuBar menuBar = new MenuBar(fileMenu);
+
+        BorderPane root = new BorderPane();
+        VBox top = new VBox(menuBar); // keep simple now; can add other top bars if needed
+        root.setTop(top);
+        root.setCenter(scroll);
+        root.setBottom(buttonBox);
+        BorderPane.setAlignment(buttonBox, Pos.CENTER);
+
+        Scene scene = new Scene(root, 600, 700);
         stage.setScene(scene);
         stage.setTitle("抽奖程序");
         stage.show();
@@ -66,6 +97,32 @@ public class LotteryView {
 
         startBtn.setOnAction(e -> controller.start());
         stopBtn.setOnAction(e -> controller.stop());
+        exportItem.setOnAction(e -> saveLastWinnersToCSV());
+        importItem.setOnAction(e -> importUsers());
+    }
+
+    private void importUsers() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("导入名单");
+        chooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("文本/CSV 文件", "*.txt", "*.csv"),
+                new FileChooser.ExtensionFilter("所有文件", "*.*")
+        );
+        // default to current data folder if exists
+        File defaultDir = new File("data");
+        if (defaultDir.exists() && defaultDir.isDirectory()) {
+            chooser.setInitialDirectory(defaultDir);
+        }
+        File file = chooser.showOpenDialog(stage);
+        if (file == null) return;
+        List<User> newUsers = UserLoader.loadUsers(file.getAbsolutePath());
+        if (newUsers == null || newUsers.isEmpty()) {
+            new Alert(Alert.AlertType.ERROR, "导入失败或名单为空，请检查文件格式：每行为 编号,姓名,图片路径", ButtonType.OK).showAndWait();
+            return;
+        }
+        controller.replaceUsers(newUsers);
+        winnersDisplayPane.getChildren().clear();
+        currentStatusLabel.setText("已导入 " + newUsers.size() + " 人，请点击开始抽奖");
     }
 
     public void updateDisplay(List<User> usersToDisplay) {
@@ -168,9 +225,6 @@ public class LotteryView {
         return new VBox(5, imageView, nameIdLabel);
     }
 
-
-
-
     public void showMessage(String msg, List<User> winners) {
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("抽奖结果");
@@ -228,10 +282,19 @@ public class LotteryView {
         scrollPane.setStyle("-fx-background-color: transparent;");
 
         dialog.getDialogPane().setContent(scrollPane);
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        // Add buttons: Close and Save CSV
+        ButtonType saveType = new ButtonType("保存为CSV", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CLOSE);
+
+        // Wire save action
+        Node saveButton = dialog.getDialogPane().lookupButton(saveType);
+        saveButton.addEventFilter(javafx.event.ActionEvent.ACTION, evt -> {
+            evt.consume();
+            saveLastWinnersToCSV();
+        });
+
         dialog.showAndWait();
     }
-
 
     // 提供接口给控制器读取
     public int getDrawCount() {
@@ -244,5 +307,30 @@ public class LotteryView {
 
     public boolean isRepeatAllowed() {
         return repeatCheck.isSelected();
+    }
+
+    private void saveLastWinnersToCSV() {
+        if (!controller.hasLastWinners()) {
+            new Alert(Alert.AlertType.INFORMATION, "暂无可保存的抽奖结果，请先完成一次抽奖。", ButtonType.OK).showAndWait();
+            return;
+        }
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("保存抽奖结果");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV 文件 (*.csv)", "*.csv"));
+        String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        chooser.setInitialFileName("中奖结果_" + ts + ".csv");
+        File file = chooser.showSaveDialog(stage);
+        if (file == null) return;
+        // Ensure .csv extension
+        if (!file.getName().toLowerCase().endsWith(".csv")) {
+            file = new File(file.getParentFile(), file.getName() + ".csv");
+        }
+
+        boolean ok = controller.exportLastWinnersToCSV(file);
+        if (ok) {
+            new Alert(Alert.AlertType.INFORMATION, "保存成功：" + file.getAbsolutePath(), ButtonType.OK).showAndWait();
+        } else {
+            new Alert(Alert.AlertType.ERROR, "保存失败，请重试或更换位置。", ButtonType.OK).showAndWait();
+        }
     }
 }

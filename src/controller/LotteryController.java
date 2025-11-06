@@ -6,6 +6,10 @@ import model.User;
 import view.LotteryView;
 
 import java.util.*;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class LotteryController {
     private final List<User> users;
@@ -15,6 +19,10 @@ public class LotteryController {
 
     private Timeline timeline;
     private User currentUser;
+
+    // Store last draw result and simple history
+    private List<User> lastWinners = new ArrayList<>();
+    private final List<List<User>> history = new ArrayList<>();
 
     public LotteryController(List<User> users, LotteryView view) {
         this.users = new ArrayList<>(users);
@@ -45,6 +53,12 @@ public class LotteryController {
             for (int i = 0; i < count; i++) {
                 User user = drawOne(repeatAllowed);
                 if (user != null) winners.add(user);
+            }
+
+            // Save last winners and append to history
+            lastWinners = new ArrayList<>(winners);
+            if (!lastWinners.isEmpty()) {
+                history.add(new ArrayList<>(lastWinners));
             }
 
             view.showMessage("中奖名单：", winners);
@@ -94,4 +108,61 @@ public class LotteryController {
         view.updateDisplay(usersToDisplay);
     }
 
+    // Export the latest draw result to CSV
+    public boolean exportLastWinnersToCSV(File file) {
+        if (lastWinners == null || lastWinners.isEmpty() || file == null) {
+            return false;
+        }
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        String drawTime = LocalDateTime.now().format(fmt);
+        try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8))) {
+            // UTF-8 BOM for Excel compatibility on Windows
+            bw.write('\uFEFF');
+            bw.write("编号,姓名,照片路径,抽取时间");
+            bw.newLine();
+            for (User u : lastWinners) {
+                String id = safe(u.getId());
+                String name = safe(u.getName());
+                String photo = safe(u.getPhotoPath());
+                bw.write(String.join(",", escapeCsv(id), escapeCsv(name), escapeCsv(photo), escapeCsv(drawTime)));
+                bw.newLine();
+            }
+            bw.flush();
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private static String safe(String s) { return s == null ? "" : s; }
+
+    private static String escapeCsv(String s) {
+        if (s.contains(",") || s.contains("\"") || s.contains("\n") || s.contains("\r")) {
+            s = s.replace("\"", "\"\"");
+            return "\"" + s + "\"";
+        }
+        return s;
+    }
+
+    public boolean hasLastWinners() {
+        return lastWinners != null && !lastWinners.isEmpty();
+    }
+
+    // Allow replacing the roster safely
+    public void replaceUsers(List<User> newUsers) {
+        // Stop timeline if running
+        if (timeline != null && timeline.getStatus() == Animation.Status.RUNNING) {
+            timeline.stop();
+        }
+        // Replace list contents without reassigning the final reference
+        users.clear();
+        if (newUsers != null) {
+            users.addAll(newUsers);
+        }
+        // Reset state
+        usedIds.clear();
+        lastWinners = new ArrayList<>();
+        history.clear();
+    }
 }

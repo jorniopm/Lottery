@@ -8,14 +8,23 @@ import javafx.scene.shape.Rectangle;
 
 import java.io.*;
         import java.util.*;
+import java.nio.charset.StandardCharsets;
 
 public class UserLoader {
 
     public static List<User> loadUsers(String filePath) {
         List<User> users = new ArrayList<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(filePath), StandardCharsets.UTF_8))) {
             String line;
+            boolean firstLine = true;
             while ((line = br.readLine()) != null) {
+                if (firstLine) {
+                    // strip UTF-8 BOM if present
+                    if (!line.isEmpty() && line.charAt(0) == '\uFEFF') {
+                        line = line.substring(1);
+                    }
+                    firstLine = false;
+                }
                 String[] parts = line.split(",");
                 if (parts.length >= 3) {
                     String id = parts[0].trim();
