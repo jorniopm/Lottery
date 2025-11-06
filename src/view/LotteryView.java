@@ -117,7 +117,7 @@ public class LotteryView {
         if (file == null) return;
         List<User> newUsers = UserLoader.loadUsers(file.getAbsolutePath());
         if (newUsers == null || newUsers.isEmpty()) {
-            new Alert(Alert.AlertType.ERROR, "导入失败或名单为空，请检查文件格式：每行为 编号,姓名,图片路径", ButtonType.OK).showAndWait();
+            new Alert(Alert.AlertType.ERROR, "导入失败，请检查文件格式：编号,姓名,图片路径", ButtonType.OK).showAndWait();
             return;
         }
         controller.replaceUsers(newUsers);
