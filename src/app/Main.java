@@ -5,7 +5,6 @@ import javafx.stage.Stage;
 import model.User;
 import model.UserLoader;
 import view.LotteryView;
-import javafx.scene.image.Image;
 
 import java.util.List;
 

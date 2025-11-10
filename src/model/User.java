@@ -1,12 +1,9 @@
 package model;
 
-import javafx.scene.image.Image;
-
 public class User {
-        private String id;
-        private String name;
-        private String photoPath;
-        private Image roundedImage; // 缓存圆角头像
+        private final String id;
+        private final String name;
+        private final String photoPath;
 
         public User(String id, String name, String photoPath) {
             this.id = id;
@@ -17,6 +14,4 @@ public class User {
         public String getId() { return id; }
         public String getName() { return name; }
         public String getPhotoPath() { return photoPath; }
-    public Image getRoundedImage() { return roundedImage; }
-    public void setRoundedImage(Image roundedImage) { this.roundedImage = roundedImage; }
 }

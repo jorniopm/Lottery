@@ -19,9 +19,8 @@ public class LotteryController {
 
     private Timeline timeline;
 
-    // Store last draw result and simple history
+    // Store last draw result
     private List<User> lastWinners = new ArrayList<>();
-    private final List<List<User>> history = new ArrayList<>();
 
     public LotteryController(List<User> users, LotteryView view) {
         this.users = new ArrayList<>(users);
@@ -49,30 +48,32 @@ public class LotteryController {
             boolean repeatAllowed = view.isRepeatAllowed();
 
             List<User> winners = new ArrayList<>();
-            for (int i = 0; i < count; i++) {
-                User user = drawOne(repeatAllowed);
-                if (user != null) winners.add(user);
+
+            // Build a temporary pool for THIS single draw so we don't pick the same person twice
+            // within the same stop() invocation. This respects global `usedIds` only when
+            // repeatAllowed == false (i.e. people already drawn in previous rounds are excluded).
+            List<User> pool = new ArrayList<>(users);
+            if (!repeatAllowed) {
+                pool.removeIf(u -> usedIds.contains(u.getId()));
             }
 
-            // Save last winners and append to history
-            lastWinners = new ArrayList<>(winners);
-            if (!lastWinners.isEmpty()) {
-                history.add(new ArrayList<>(lastWinners));
+            // Cap the number of winners to the pool size to avoid infinite loops
+            int picks = Math.min(count, pool.size());
+            for (int i = 0; i < picks; i++) {
+                if (pool.isEmpty()) break;
+                User selected = pool.remove(random.nextInt(pool.size()));
+                winners.add(selected);
+                // If repeats are not allowed across rounds, mark selected as used globally
+                if (!repeatAllowed) {
+                    usedIds.add(selected.getId());
+                }
             }
+
+            // Save last winners
+            lastWinners = new ArrayList<>(winners);
 
             view.showMessage("中奖名单：", winners);
         }
-    }
-
-    private User drawOne(boolean repeatAllowed) {
-        List<User> available = new ArrayList<>(users);
-        if (!repeatAllowed) {
-            available.removeIf(u -> usedIds.contains(u.getId()));
-        }
-        if (available.isEmpty()) return null;
-        User selected = available.get(random.nextInt(available.size()));
-        if (!repeatAllowed) usedIds.add(selected.getId());
-        return selected;
     }
 
     private void showRandomUser() {
@@ -93,16 +94,15 @@ public class LotteryController {
             return;
         }
 
-        // Select 'count' random users for display during scrolling
+        // Select 'count' random users for display during scrolling.
+        // Remove selected items from the temporary list to avoid duplicates within the
+        // same frame (so the same person doesn't appear more than once in that display).
         for (int i = 0; i < count; i++) {
             if (availableUsersForRandom.isEmpty()) {
                 break; // Not enough users to display 'count' unique users
             }
-            User user = availableUsersForRandom.get(random.nextInt(availableUsersForRandom.size()));
+            User user = availableUsersForRandom.remove(random.nextInt(availableUsersForRandom.size()));
             usersToDisplay.add(user);
-            if (!repeatAllowed) {
-                availableUsersForRandom.remove(user);
-            }
         }
         view.updateDisplay(usersToDisplay);
     }
@@ -129,7 +129,7 @@ public class LotteryController {
             bw.flush();
             return true;
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("导出 CSV 时发生错误: " + e.getMessage());
             return false;
         }
     }
@@ -162,7 +162,6 @@ public class LotteryController {
         // Reset state
         usedIds.clear();
         lastWinners = new ArrayList<>();
-        history.clear();
     }
 
     // Snapshot of current users for preview

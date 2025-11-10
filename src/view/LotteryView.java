@@ -168,23 +168,11 @@ public class LotteryView {
                 VBox card = new VBox(10);
                 card.setAlignment(Pos.CENTER);
                 try {
-                    Image img = loadImage(user.getPhotoPath(), 113, 150);
-                    ImageView iv = new ImageView(img);
+                    Image rounded = loadRoundedImage(user.getPhotoPath(), 113, 150);
+                    ImageView iv = new ImageView(rounded);
                     iv.setFitWidth(113);
                     iv.setFitHeight(150);
                     iv.setPreserveRatio(false);
-
-                    Rectangle clip = new Rectangle(113, 150);
-                    clip.setArcWidth(15);
-                    clip.setArcHeight(15);
-                    iv.setClip(clip);
-
-                    SnapshotParameters params = new SnapshotParameters();
-                    params.setFill(Color.TRANSPARENT);
-                    WritableImage roundedImage = iv.snapshot(params, null);
-                    iv.setClip(null);
-                    iv.setImage(roundedImage);
-
                     card.getChildren().add(iv);
                 } catch (Exception ex) {
                     // ignore image errors and only show text
@@ -221,7 +209,7 @@ public class LotteryView {
             if (i < currentCardCount) {
                 card = (VBox) currentCards.get(i);
                 ImageView imageView = (ImageView) card.getChildren().get(0);
-                Image img = loadImage(user.getPhotoPath(), 113, 150);
+                Image img = loadRoundedImage(user.getPhotoPath(), 113, 150);
                 imageView.setImage(img);
                 Label nameIdLabel = (Label) card.getChildren().get(1);
                 nameIdLabel.setText(user.getId() + " - " + user.getName());
@@ -237,21 +225,18 @@ public class LotteryView {
         }
     }
 
+    // Load raw image (no rounding). Returns default placeholder when missing.
     private Image loadImage(String path, double reqWidth, double reqHeight) {
-        System.out.println("loadImage: Attempting to load image from path: " + path);
-        // Fallback to default if path empty
         if (path == null || path.trim().isEmpty()) {
             return getDefaultImage(reqWidth, reqHeight);
         }
 
-        String cacheKey = path + "_" + reqWidth + "_" + reqHeight;
+        String cacheKey = "RAW_" + path + "_" + reqWidth + "_" + reqHeight;
         if (imageCache.containsKey(cacheKey)) {
-            System.out.println("loadImage: Image found in cache for key: " + cacheKey);
             return imageCache.get(cacheKey);
         }
 
         try {
-            System.out.println("loadImage: Cache miss for key: " + cacheKey);
             String uri = null;
             String p = path.trim();
             if (p.startsWith("http://") || p.startsWith("https://") || p.startsWith("file:")) {
@@ -269,32 +254,52 @@ public class LotteryView {
                 }
             }
             if (uri != null) {
-                System.out.println("loadImage: Resolved URI: " + uri);
                 Image image = new Image(uri, reqWidth, reqHeight, true, true);
                 if (image.isError()) {
-                    System.err.println("loadImage: Error loading image from URI: " + uri + ", using default placeholder.");
                     Image def = getDefaultImage(reqWidth, reqHeight);
                     imageCache.put(cacheKey, def);
                     return def;
                 } else {
-                    System.out.println("loadImage: Image loaded successfully from URI: " + uri);
                     imageCache.put(cacheKey, image);
                     return image;
                 }
             } else {
-                System.out.println("loadImage: URI is null, using default placeholder.");
                 Image def = getDefaultImage(reqWidth, reqHeight);
                 imageCache.put(cacheKey, def);
                 return def;
             }
         } catch (Exception e) {
-            System.err.println("loadImage: Exception while loading image from path: " + path + ", Exception: " + e.getMessage());
             return getDefaultImage(reqWidth, reqHeight);
         }
     }
 
+    // Load and return a rounded (snapshot) image with caching
+    private Image loadRoundedImage(String path, double reqWidth, double reqHeight) {
+        String key = "ROUND_" + (path == null ? "" : path) + "_" + reqWidth + "_" + reqHeight;
+        if (imageCache.containsKey(key)) return imageCache.get(key);
+
+        Image base = loadImage(path, reqWidth, reqHeight);
+        ImageView iv = new ImageView(base);
+        iv.setFitWidth(reqWidth);
+        iv.setFitHeight(reqHeight);
+        iv.setPreserveRatio(false);
+
+        Rectangle clip = new Rectangle(reqWidth, reqHeight);
+        clip.setArcWidth(15);
+        clip.setArcHeight(15);
+        iv.setClip(clip);
+
+        SnapshotParameters params = new SnapshotParameters();
+        params.setFill(Color.TRANSPARENT);
+
+        WritableImage rounded = iv.snapshot(params, null);
+        iv.setClip(null);
+        imageCache.put(key, rounded);
+        return rounded;
+    }
+
     private Image getDefaultImage(double reqWidth, double reqHeight) {
-        String[] defaults = new String[] { "images/default.jpg", };
+        String[] defaults = new String[] { "images/default.png", "images/default.jpg" };
         for (String p : defaults) {
             String key = "__DEFAULT__" + p + "_" + reqWidth + "_" + reqHeight;
             if (imageCache.containsKey(key)) {
@@ -312,34 +317,37 @@ public class LotteryView {
                     // ignore
                 }
             }
+            // try classpath resource
+            java.net.URL res = getClass().getResource("/" + p);
+            if (res != null) {
+                try {
+                    Image img = new Image(res.toString(), reqWidth, reqHeight, true, true);
+                    if (!img.isError()) {
+                        imageCache.put(key, img);
+                        return img;
+                    }
+                } catch (Exception ignore) {
+                }
+            }
         }
-        // As a very last resort, create a 1x1 transparent image to avoid NPEs
         WritableImage empty = new WritableImage((int)Math.max(1, reqWidth), (int)Math.max(1, reqHeight));
         return empty;
     }
 
     private VBox createUserCard(User user) {
-        ImageView imageView = new ImageView();
+        Image roundedImg = loadRoundedImage(user.getPhotoPath(), 113, 150);
+
+        ImageView imageView = new ImageView(roundedImg);
         imageView.setFitWidth(113);
         imageView.setFitHeight(150);
-        imageView.setPreserveRatio(false); // 保证矩形比例正确
-
-        Image img = loadImage(user.getPhotoPath(), 113, 150);
-        imageView.setImage(img);
-
-        Rectangle clip = new Rectangle(113, 150);
-        clip.setArcWidth(15);  // 控制圆角弧度
-        clip.setArcHeight(15);
-        imageView.setClip(clip);
-
-        SnapshotParameters params = new SnapshotParameters();
-        params.setFill(Color.TRANSPARENT); // 避免裁剪后黑边
-        WritableImage roundedImg = imageView.snapshot(params, null);
+        imageView.setPreserveRatio(false);
 
         Label nameIdLabel = new Label(user.getId() + " - " + user.getName());
         nameIdLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #333;");
 
-        return new VBox(5, imageView, nameIdLabel);
+        VBox box = new VBox(5, imageView, nameIdLabel);
+        box.setAlignment(Pos.CENTER);
+        return box;
     }
 
     public void showMessage(String msg, List<User> winners) {
@@ -356,26 +364,12 @@ public class LotteryView {
                 VBox card = new VBox(10);
                 card.setAlignment(Pos.CENTER);
 
-                // 创建圆角矩形头像
                 try {
-                    Image img = loadImage(user.getPhotoPath(), 113, 150);
-                    ImageView iv = new ImageView(img);
+                    Image rounded = loadRoundedImage(user.getPhotoPath(), 113, 150);
+                    ImageView iv = new ImageView(rounded);
                     iv.setFitWidth(113);
                     iv.setFitHeight(150);
                     iv.setPreserveRatio(false);
-
-                    // 生成圆角矩形图像
-                    Rectangle clip = new Rectangle(113, 150);
-                    clip.setArcWidth(15);
-                    clip.setArcHeight(15);
-                    iv.setClip(clip);
-
-                    SnapshotParameters params = new SnapshotParameters();
-                    params.setFill(Color.TRANSPARENT);
-                    WritableImage roundedImage = iv.snapshot(params, null);
-
-                    iv.setClip(null);
-                    iv.setImage(roundedImage);
 
                     card.getChildren().add(iv);
                 } catch (Exception e) {

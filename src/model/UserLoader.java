@@ -1,10 +1,5 @@
 package model;
 
-import javafx.scene.SnapshotParameters;
-import javafx.scene.image.*;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
-
 import java.io.*;
 import java.util.*;
 import java.nio.charset.StandardCharsets;
@@ -35,18 +30,14 @@ public class UserLoader {
                     String photoPathRaw = parts.length >= 3 ? parts[2].trim() : "";
 
                     File resolved = resolvePhotoFile(photoPathRaw, id, name, csvDir, imagesDir);
-                    String finalPhotoPath = resolved != null ? resolved.getPath() : photoPathRaw;
+                    String finalPhotoPath = resolved != null ? resolved.getPath() : "";
 
-                    System.out.println("UserLoader: Loading user: " + id + ", Name: " + name + ", Photo Path: " + finalPhotoPath);
-
-                    Image roundedImage = createRoundedImage(finalPhotoPath, 113, 150);
                     User user = new User(id, name, finalPhotoPath);
-                    user.setRoundedImage(roundedImage);
                     users.add(user);
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            // Let caller handle empty or failed load by returning empty list
         }
         return users;
     }
@@ -104,37 +95,5 @@ public class UserLoader {
             }
         }
         return null;
-    }
-
-    private static Image createRoundedImage(String path, double width, double height) {
-        try {
-            if (path == null || path.isEmpty()) return null;
-            File f = new File(path);
-            if (!f.isAbsolute()) {
-                f = new File(System.getProperty("user.dir"), path);
-            }
-            if (!f.exists()) {
-                return null;
-            }
-            Image img = new Image(f.toURI().toString(), width, height, false, true);
-
-            Rectangle clip = new Rectangle(width, height);
-            clip.setArcWidth(15);
-            clip.setArcHeight(15);
-
-            ImageView iv = new ImageView(img);
-            iv.setFitWidth(width);
-            iv.setFitHeight(height);
-            iv.setPreserveRatio(false);
-            iv.setClip(clip);
-
-            SnapshotParameters params = new SnapshotParameters();
-            params.setFill(Color.TRANSPARENT);
-
-            return iv.snapshot(params, null);
-        } catch (Exception e) {
-            System.err.println("无法加载图片：" + path);
-            return null;
-        }
     }
 }
