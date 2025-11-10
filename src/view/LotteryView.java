@@ -17,6 +17,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.stage.FileChooser;
+import javafx.stage.DirectoryChooser;
 import model.User;
 import model.UserLoader;
 
@@ -75,10 +76,11 @@ public class LotteryView {
         // Menus
         Menu fileMenu = new Menu("文件");
         MenuItem importItem = new MenuItem("导入名单…");
+        MenuItem importImagesItem = new MenuItem("导入图片…");
         MenuItem exportItem = new MenuItem("导出结果…");
         importItem.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.CONTROL_DOWN));
         exportItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN));
-        fileMenu.getItems().addAll(importItem, exportItem, new SeparatorMenuItem());
+        fileMenu.getItems().addAll(importItem, importImagesItem, exportItem, new SeparatorMenuItem());
 
         Menu viewMenu = new Menu("查看");
         MenuItem previewItem = new MenuItem("预览名单…");
@@ -105,6 +107,7 @@ public class LotteryView {
         stopBtn.setOnAction(e -> controller.stop());
         exportItem.setOnAction(e -> saveLastWinnersToCSV());
         importItem.setOnAction(e -> importUsers());
+        importImagesItem.setOnAction(e -> importImagesBatch());
         previewItem.setOnAction(e -> previewRoster());
     }
 
@@ -144,7 +147,7 @@ public class LotteryView {
         File file = chooser.showOpenDialog(stage);
         if (file == null) return;
         List<User> newUsers = UserLoader.loadUsers(file.getAbsolutePath());
-        if (newUsers == null || newUsers.isEmpty()) {
+        if (newUsers.isEmpty()) {
             new Alert(Alert.AlertType.ERROR, "导入失败，请检查文件格式：编号,姓名,图片路径", ButtonType.OK).showAndWait();
             return;
         }
@@ -330,8 +333,7 @@ public class LotteryView {
                 }
             }
         }
-        WritableImage empty = new WritableImage((int)Math.max(1, reqWidth), (int)Math.max(1, reqHeight));
-        return empty;
+        return new WritableImage((int)Math.max(1, reqWidth), (int)Math.max(1, reqHeight));
     }
 
     private VBox createUserCard(User user) {
@@ -441,6 +443,99 @@ public class LotteryView {
             new Alert(Alert.AlertType.INFORMATION, "保存成功：" + file.getAbsolutePath(), ButtonType.OK).showAndWait();
         } else {
             new Alert(Alert.AlertType.ERROR, "保存失败，请重试或更换位置。", ButtonType.OK).showAndWait();
+        }
+    }
+
+    // Batch import images from a selected directory and match them to users by id or name
+    private void importImagesBatch() {
+        List<User> current = controller.getUsersSnapshot();
+        if (current == null || current.isEmpty()) {
+            new Alert(Alert.AlertType.INFORMATION, "当前没有导入任何名单，请先导入名单文件。", ButtonType.OK).showAndWait();
+            return;
+        }
+
+        DirectoryChooser dc = new DirectoryChooser();
+        dc.setTitle("选择包含图片的文件夹");
+        File defaultDir = new File("images");
+        if (defaultDir.exists() && defaultDir.isDirectory()) dc.setInitialDirectory(defaultDir);
+        File dir = dc.showDialog(stage);
+        if (dir == null) return;
+
+        // collect image files recursively
+        List<File> imageFiles = new java.util.ArrayList<>();
+        collectImageFiles(dir, imageFiles);
+        if (imageFiles.isEmpty()) {
+            new Alert(Alert.AlertType.INFORMATION, "所选目录中未发现图片文件。", ButtonType.OK).showAndWait();
+            return;
+        }
+
+        // build a map from filenameWithoutExt -> file
+        Map<String, File> nameMap = new HashMap<>();
+        for (File f : imageFiles) {
+            String name = f.getName();
+            int idx = name.lastIndexOf('.');
+            String base = idx > 0 ? name.substring(0, idx) : name;
+            nameMap.put(base.toLowerCase(), f);
+        }
+
+        int matched = 0;
+        List<User> updated = new java.util.ArrayList<>();
+        List<String> unmatched = new java.util.ArrayList<>();
+        for (User u : current) {
+            String id = u.getId();
+            String name = u.getName();
+            File match = null;
+            if (id != null && !id.isEmpty()) match = nameMap.get(id.toLowerCase());
+            if (match == null && name != null && !name.isEmpty()) match = nameMap.get(name.toLowerCase());
+            if (match == null) {
+                // try more permissive: filenames that contain id or name
+                for (Map.Entry<String, File> e : nameMap.entrySet()) {
+                    if (id != null && !id.isEmpty() && e.getKey().contains(id.toLowerCase())) { match = e.getValue(); break; }
+                    if (name != null && !name.isEmpty() && e.getKey().contains(name.toLowerCase())) { match = e.getValue(); break; }
+                }
+            }
+            if (match != null) {
+                matched++;
+                updated.add(new User(u.getId(), u.getName(), match.getAbsolutePath()));
+            } else {
+                unmatched.add(u.getId() + " - " + u.getName());
+                updated.add(new User(u.getId(), u.getName(), u.getPhotoPath()));
+            }
+        }
+
+        controller.replaceUsers(updated);
+        winnersDisplayPane.getChildren().clear();
+
+        String msg = "已匹配图片: " + matched + "，未匹配: " + unmatched.size();
+        Alert a = new Alert(Alert.AlertType.INFORMATION);
+        a.setTitle("批量导入图片完成");
+        a.setHeaderText(msg);
+        if (!unmatched.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < Math.min(50, unmatched.size()); i++) {
+                sb.append(unmatched.get(i)).append("\n");
+            }
+            if (unmatched.size() > 50) sb.append("... (共 ").append(unmatched.size()).append(" 项未匹配)");
+            TextArea ta = new TextArea(sb.toString());
+            ta.setEditable(false);
+            ta.setWrapText(true);
+            ta.setPrefRowCount(Math.min(20, unmatched.size()));
+            a.getDialogPane().setContent(ta);
+        }
+        a.showAndWait();
+    }
+
+    private void collectImageFiles(File dir, List<File> out) {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            if (f.isDirectory()) collectImageFiles(f, out);
+            else {
+                String n = f.getName().toLowerCase();
+                if (n.endsWith(".png") || n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".bmp") || n.endsWith(".gif") || n.endsWith(".webp")) {
+                    out.add(f);
+                }
+            }
         }
     }
 }
