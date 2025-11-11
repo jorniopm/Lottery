@@ -73,7 +73,7 @@ public class LotteryView {
         scroll.setFitToHeight(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 
-        // Menus
+        // Menu
         Menu fileMenu = new Menu("文件");
         MenuItem importItem = new MenuItem("导入名单…");
         MenuItem importImagesItem = new MenuItem("导入图片…");
@@ -95,6 +95,7 @@ public class LotteryView {
         root.setBottom(buttonBox);
         BorderPane.setAlignment(buttonBox, Pos.CENTER);
 
+        // Scene and stage setup
         Scene scene = new Scene(root, 600, 500);
         stage.setScene(scene);
         stage.setTitle("抽奖程序");
@@ -156,6 +157,7 @@ public class LotteryView {
         currentStatusLabel.setText("已导入 " + newUsers.size() + " 人，请点击开始抽奖");
     }
 
+    // preview the current roster in a dialog
     private void previewRoster() {
         List<User> snapshot = controller.getUsersSnapshot();
         Dialog<Void> dialog = new Dialog<>();
@@ -408,12 +410,12 @@ public class LotteryView {
         dialog.showAndWait();
     }
 
-    // 提供接口给控制器读取
+    // 提供接口给控制器读取, 获取人数
     public int getDrawCount() {
         try {
             return Integer.parseInt(countField.getText());
         } catch (NumberFormatException e) {
-            return 1;
+            return 1; //默认返回1
         }
     }
 

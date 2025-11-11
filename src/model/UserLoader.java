@@ -67,7 +67,7 @@ public class UserLoader {
                 if (byName.exists()) return byName;
             }
         }
-        // Try infer by id/name with common extensions in images dir
+
         String[] exts = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"};
         if (imagesDir != null) {
             for (String ext : exts) {
